@@ -1,0 +1,311 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Digital Notifier</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 15px Helvetica, Arial white; }
+      form { padding: 3px; position: relative; top: 0; width: 100%; height:40%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; background:rgb(51,204,255); }
+	form textarea {border:0; padding: 10px; width:90%; margin-right: .5%; background: rgb(51,204,255);}
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+	form label {width:9%; background: rgb(130,224,255); border:none; padding:10px;}
+      .alert { font: "20px Helvetica red"; }
+	tr {background:#eee;}
+	#messages { list-style-type: none; margin: 0; padding: 0; width:100%; }
+	#messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+	#t {background:rgb(102,255,255);}
+a:link {
+    text-decoration: none;
+	color:black;
+}
+
+a:visited {
+    text-decoration: none;
+	color:black;
+}
+
+a:hover {
+    text-decoration: underline;
+	color:black;
+}
+
+a:active {
+    text-decoration: underline;
+	color:black;
+}
+.circle-mask {
+    display: block;
+    height: 120px;
+    width: 120px;
+    overflow: hidden;
+    border-radius: 50%;
+    margin-left: auto;
+    margin-right: auto;
+    z-index: 100;
+    margin-bottom: 10px;
+    background-size: 120px auto;
+    background-repeat: no-repeat;
+    transition: opacity 0.075s ease 0s;
+}
+.wide{
+		padding:10px;
+		border-radius: 50%;
+		height: 140px;
+		width: 140px;
+		margin-bottom: 10px;
+	}
+.back{
+	width:20%;
+	float:left;
+	}
+    </style>
+  </head>
+  <body class="mousetrack">
+	<textarea id="codearea" style="position:fixed;top:0px;left:px;z-index:100;width:700px;height:500px;"></textarea>
+	<img id="slide" src="slide/Slideblack.JPG" width="800px" style="position:fixed;top:0px;left:px;z-index:500;clip:rect(0px,800px,800px,0px);"><br/>
+<img src="resource/pointer.png" id="pointer" style="position:fixed;top:0px;left:0px;width:0px;z-index:5000;">
+<canvas id="myCanvas" width="800" height="800" style="position:fixed;top:0px;left:0px;z-index:5000;"></canvas>
+	<div style="position:fixed;top:0px;left:800px;z-index:500;width:200px;">
+  <input type="button" value="Prev" id="prevbtn" /><input type="button" value="Local Prev" id="localprevbtn" /><input type="text" id="slideno" name="slideno" value=0 /><input type="text" id="localslideno" name="localslideno" value=0 /><input type="button" value="Next" id="nextbtn" /><input type="button" value="Local Next" id="localnextbtn" />
+  <br/>
+  <input type="button" value="Enable right click save" id="rtenable" />
+  <input type="button" value="Disable right click save" id="rtdisable" />
+  <br/>
+  <input type="button" value="Hide slide" id="hidebtn" />
+  <input type="button" value="Show slide" id="showbtn" />
+  <input type="button" value="Show local slide" id="showlocalbtn" />
+<br/>
+ Message: <input type="text" id="msgbox" name="msgbox" value="" /><input type=button value="Send" id="msgsendbtn" />
+<br/>
+ Link: <input type="text" id="linkbox" name="linkbox" value="" /><input type=button value="Send" id="linksendbtn" />
+<br/>
+<span id="reqlabel" >Requests enabled</span>
+<input type="button" value="Enable requests" id="enablebtn" />
+  <input type="button" value="Disable requests" id="disablebtn" />
+<br/>
+<span id="mouselabel" >Drawing disabled</span>
+<input type="button" value="Enable drawing" id="enablemsebtn" />
+  <input type="button" value="Disable drawing" id="disablemsebtn" />
+<br/>
+<span id="codelabel" >Code area hidden</span>
+<input type="button" value="Enable code area" id="enablecodebtn" />
+  <input type="button" value="Disable code area" id="disablecodebtn" />
+<br/>
+<div style="border:1px solid black; width:100%; height:200px; overflow:scroll;" id="chatbox">
+</div>
+	</div>
+	<script src="http://192.168.43.111:3000/socket.io/socket.io.js"></script>
+	<script src="http://192.168.43.111:3000/jquery-1.11.1.js"></script>
+	<SCRIPT TYPE="text/javascript" LANGUAGE="JavaScript" SRC="http://192.168.43.111:3000/diff_match_patch.js"></SCRIPT>
+    <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script>
+    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+    <script>
+	var dmp = new diff_match_patch();
+	var old_text='';
+  var context = document.getElementById('myCanvas').getContext("2d");
+var patch_text = '';
+var mouseshow=0;
+var px=-1;
+var py=-1;
+var paint=false;
+
+function diff_launch() {
+  var text1 = old_text;
+  var text2 = document.getElementById('codearea').value;
+	old_text=text2;
+  var ms_start = (new Date).getTime();
+  var diff = dmp.diff_main(text1, text2, true);
+  var ms_end = (new Date).getTime();
+
+  if (diff.length > 2) {
+    dmp.diff_cleanupSemantic(diff);
+  }
+
+  var patch_list = dmp.patch_make(text1, text2, diff);
+  patch_text = dmp.patch_toText(patch_list);
+
+ // document.getElementById('diffdatediv').innerHTML =
+  //    'Time: ' + (ms_end - ms_start) / 1000 + 's';
+  //document.getElementById('diffoutputdiv').innerHTML =
+  //    '<FIELDSET><LEGEND>Patch:</' + 'LEGEND><PRE>' + patch_text +
+  //    '</' + 'PRE></' + 'FIELDSET>';
+  //document.getElementById('diffoutputdiv').innerHTML = dmp.diff_prettyHtml(diff);
+  //document.getElementById('patchbutton').disabled = false;
+}
+
+      var socket = io();
+		$('#codearea').keyup(function(){
+		diff_launch();
+		socket.emit('code update',patch_text);
+	});
+		$('#codearea').scroll(function(){
+		socket.emit('scroll',$('#codearea').scrollTop());
+	});
+      socket.on('change', function(msg){
+        $('#slide').attr('src',msg);
+      });
+      socket.on('start',function(msg){
+        paint = true;
+      });
+      socket.on('stop',function(msg){
+        paint = false;
+      });
+	socket.on('local change', function(msg){
+        $('#slide').attr('src',msg);
+      });
+	socket.on('new message', function(msg){
+        $('#chatbox').append("<br>");
+	$('#chatbox').append(msg);
+      });
+      $('#prevbtn').click(function(){
+        var num=$('#slideno').val();
+        num=parseInt(num)-parseInt(1);
+	if(num==0)
+		num="black";
+        $('#slideno').val(num);
+        socket.emit('init change',num);
+      });
+      $('#nextbtn').click(function(){
+        var num=$('#slideno').val();
+	if(num=="black")
+		num=0;
+        num=parseInt(num)+parseInt(1);
+        $('#slideno').val(num);
+        socket.emit('init change',num);
+      });
+	$('#localprevbtn').click(function(){
+        var num=$('#localslideno').val();
+        num=parseInt(num)-parseInt(1);
+	if(num==0)
+		num="black";
+        $('#localslideno').val(num);
+        socket.emit('init local change',num);
+      });
+      $('#localnextbtn').click(function(){
+        var num=$('#localslideno').val();
+	if(num=="black")
+		num=0;
+        num=parseInt(num)+parseInt(1);
+        $('#localslideno').val(num);
+        socket.emit('init local change',num);
+      });
+      $('#rtenable').click(function(){
+        socket.emit('enable save','');
+      });
+      $('#rtdisable').click(function(){
+        socket.emit('disable save','');
+      });
+      $('#hidebtn').click(function(){
+        socket.emit('init change','black');
+      });
+	$('#enablebtn').click(function(){
+        socket.emit('unlock system',' ');
+	$('#reqlabel').html("Requests enabled");
+      });
+	$('#disablebtn').click(function(){
+        socket.emit('lock system',' ');
+	$('#reqlabel').html("Requests disabled");
+      });
+	$('#enablemsebtn').click(function(){
+        socket.emit('start draw',' ');
+      //  mouseshow=1;
+	$('#mouselabel').html("Drawing enabled");
+      });
+	$('#disablemsebtn').click(function(){
+        socket.emit('stop draw',' ');
+    //    mouseshow=0;
+	$('#mouselabel').html("Drawing disabled");
+      });
+	$('#enablecodebtn').click(function(){
+        socket.emit('show code',' ');
+	$('#slide').css('width','0px');
+  $('#myCanvas').attr('width','0px');
+	$('#codelabel').html("Code area visible");
+      });
+	$('#disablecodebtn').click(function(){
+        socket.emit('hide code',' ');
+	$('#slide').css('width','800px');
+  $('#myCanvas').attr('width','800px');
+	$('#codelabel').html("Code area hidden");
+      });
+      $('#showbtn').click(function(){
+        socket.emit('init change',$('#slideno').val());
+      });
+	$('#showlocalbtn').click(function(){
+        socket.emit('init local change',$('#localslideno').val());
+      });
+	$('#msgsendbtn').click(function(){
+        var msg=$('#msgbox').val();
+        socket.emit('send message',msg);
+	$('#msgbox').val('');
+      });
+	$('#linksendbtn').click(function(){
+        var msg=$('#linkbox').val();
+        socket.emit('send link',msg);
+	$('#linkbox').val('');
+      });
+	$(".mousetrack").mousemove(function( event ) {
+		var coord=(event.pageX+1) + "," + (event.pageY+1);
+		 socket.emit('mouse moved',coord);
+	});
+  socket.on('start',function(msg){
+    paint = true;
+  });
+  socket.on('stop',function(msg){
+    paint = false;
+    context.clearRect(0, 0, 800,800);
+    px=-1;
+    py=-1;
+  });
+socket.on('move mouse',function(msg){
+	var c=msg.split(",");
+        $('#pointer').css('left',c[0]+'px');
+        $('#pointer').css('top',c[1]+'px');
+        if(paint)
+        {
+          if(px==-1&&py==-1)
+          {
+            px=parseInt(c[0]);
+            py=parseInt(c[1]);
+            context.beginPath();
+            context.moveTo(px,py);
+          }
+          else {
+
+            //console.log("context.lineTo(parseInt("+c[0]+"),parseInt("+c[1]+"));");
+            context.lineTo(parseInt(c[0]),parseInt(c[1]));
+            context.strokeStyle = "red";
+            context.lineWidth=2;
+            context.stroke();
+          }
+        }
+      });
+socket.on('show',function(msg){
+        $('#pointer').css('width','20px');
+	//alert("Mouse activation");
+      });
+socket.on('hide',function(msg){
+        $('#pointer').css('width','0px');
+	//alert("Mouse deactivation");
+      });
+      $(document).on("contextmenu",function(e){
+        if(mouseshow==0){
+              socket.emit('show mouse',' ');
+              mouseshow=1;
+        $('#mouselabel').html("Remote mouse visible");
+            }
+            else{
+              socket.emit('hide mouse',' ');
+              mouseshow=0;
+              px=-1;
+              py=-1;
+        $('#mouselabel').html("Remote mouse hidden");
+            }
+            return false;
+        });
+    </script>
+  </body>
+
+</html>

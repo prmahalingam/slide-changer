@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Digital Notifier</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font: 13px Helvetica, Arial white; }
+      form { padding: 3px; position: relative; top: 0; width: 100%; height:40%; }
+      form input { border: 0; padding: 10px; width: 90%; margin-right: .5%; background:rgb(51,204,255); }
+	form textarea {border:0; padding: 10px; width:90%; margin-right: .5%; background: rgb(51,204,255);}
+      form button { width: 9%; background: rgb(130, 224, 255); border: none; padding: 10px; }
+	form label {width:9%; background: rgb(130,224,255); border:none; padding:10px;}
+      #messages { list-style-type: none; margin: 0; padding: 0; background:#eee; }
+      #messages li { padding: 5px 10px; }
+      #messages li:nth-child(odd) { background: #eee; }
+	#t {background:rgb(102,255,255);}
+    </style>
+  </head>
+  <body class=".disableRight">
+	<textarea readonly id="codearea" style="position:fixed;top:0px;left:px;z-index:100;width:700px;height:500px;"></textarea>
+	<img id="slide" src="slide/Slideblack.JPG" width="800px" style="position:fixed;top:0px;left:px;z-index:500;clip:rect(0px,800px,800px,0px);" />
+	<img src="resource/pointer.png" id="pointer" style="position:fixed;top:0px;left:0px;width:0px;z-index:5000;">
+  <canvas id="myCanvas" width="800" height="800" style="position:fixed;top:0px;left:0px;z-index:10000;"></canvas>
+
+  <div id="overlay" style="position:fixed;top:0px;left:0px;width:900px;height:900px;overflow:hidden;z-index:1000;" />
+	<div style="position:fixed;top:0px;left:850px;z-index:500;width:200px;">
+<div style="border:1px solid black; width:100%; height:400px; overflow:scroll;" id="chatbox">
+</div>
+  <!--  <script src="https://cdn.socket.io/socket.io-1.2.0.js"></script> -->
+	<script src="http://10.90.7.1:3000/socket.io/socket.io.js"></script>
+	<script src="http://10.90.7.1:3000/jquery-1.11.1.js"></script>
+	<SCRIPT TYPE="text/javascript" LANGUAGE="JavaScript" SRC="http://10.90.7.1:3000/diff_match_patch.js"></SCRIPT>
+  <!--  <script src="http://code.jquery.com/jquery-1.11.1.js"></script> -->
+    <script>
+var dmp = new diff_match_patch();
+var context = document.getElementById('myCanvas').getContext("2d");
+var patch_text = '';
+var mousemovement=0;
+var paint=false;
+var px=-1;
+var py=-1;
+function patch_launch() {
+  var text1 = document.getElementById('codearea').value;
+  var patches = dmp.patch_fromText(patch_text);
+
+  var ms_start = (new Date).getTime();
+  var results = dmp.patch_apply(patches, text1);
+  var ms_end = (new Date).getTime();
+
+ // document.getElementById('patchdatediv').innerHTML =
+  //    'Time: ' + (ms_end - ms_start) / 1000 + 's';
+  document.getElementById('codearea').value = results[0];
+  //results = results[1];
+  //var html = '';
+  //for (var x = 0; x < results.length; x++) {
+  //  if (results[x]) {
+  //    html += '<LI><FONT COLOR="#009900">Ok</' + 'FONT>';
+  //  } else {
+  //    html += '<LI><FONT COLOR="#990000">Fail</' + 'FONT>';
+  //  }
+  //}
+  //document.getElementById('passfaildiv').innerHTML = html;
+}
+      var socket = io();
+      socket.on('change', function(msg){
+        $('#slide').attr('src',msg);
+      });
+      socket.on('disable',function(msg){
+        $('#overlay').css('height','900px');
+        $('#myCanvas').css('height','800px');
+      });
+	socket.on('show',function(msg){
+        $('#pointer').css('width','20px');
+	//alert("Mouse activation");
+      });
+	socket.on('scroll',function(msg){
+        $('#codearea').scrollTop(msg);
+	//alert("Mouse deactivation");
+      });
+	socket.on('hide',function(msg){
+        $('#pointer').css('width','0px');
+	//alert("Mouse deactivation");
+      });
+	socket.on('encode',function(msg){
+        $('#slide').css('width','0px');
+	//alert("Mouse activation");
+      });
+	socket.on('decode',function(msg){
+        $('#slide').css('width','800px');
+	//alert("Mouse deactivation");
+      });
+      socket.on('start',function(msg){
+        paint = true;
+      });
+      socket.on('stop',function(msg){
+        paint = false;
+        context.clearRect(0, 0, 800,800);
+        px=-1;
+        py=-1;
+      });
+      socket.on('enable',function(msg){
+        $('#overlay').css('height','0px');
+        $('#myCanvas').css('height','0px');
+      });
+	socket.on('move mouse',function(msg){
+	var c=msg.split(",");
+        $('#pointer').css('left',c[0]+'px');
+        $('#pointer').css('top',c[1]+'px');
+        if(paint)
+        {
+          if(px==-1&&py==-1)
+          {
+            px=parseInt(c[0]);
+            py=parseInt(c[1]);
+            context.beginPath();
+            context.moveTo(px,py);
+          }
+          else {
+
+            //console.log("context.lineTo(parseInt("+c[0]+"),parseInt("+c[1]+"));");
+            context.lineTo(parseInt(c[0]),parseInt(c[1]));
+            context.strokeStyle = "red";
+            context.lineWidth=2;
+            context.stroke();
+          }
+        }
+      });
+	socket.on('new message', function(msg){
+        $('#chatbox').append("<br>");
+	$('#chatbox').append(msg);
+      });
+	socket.on('code update', function(msg){
+        patch_text=msg;
+	patch_launch();
+      });
+	socket.on('scroll', function(msg){
+        $('codearea').scrollTop(msg);
+      });
+	$(document).on("contextmenu",function(e){
+
+        return false;
+    });
+    </script>
+  </body>
+</html>
